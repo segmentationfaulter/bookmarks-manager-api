@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -21,9 +22,18 @@ func Mux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", func(w http.ResponseWriter, r *http.Request) {
 		var regData = RegisterationData{}
-		json.NewDecoder(r.Body).Decode(&regData)
-		fmt.Printf("username: %v\nemail: %v\n", regData.Username, regData.Email)
-	})
+		err := json.NewDecoder(r.Body).Decode(&regData)
+		if err != nil {
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			return
+		}
 
+		hash, err := bcrypt.GenerateFromPassword([]byte(regData.Password), bcrypt.DefaultCost)
+
+		if err != nil {
+			http.Error(w, "Error hashing password", http.StatusInternalServerError)
+			return
+		}
+	})
 	return mux
 }
