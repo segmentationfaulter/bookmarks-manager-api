@@ -19,25 +19,6 @@ func main() {
 
 func Mux(db *sql.DB) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /register", func(w http.ResponseWriter, r *http.Request) {
-		user, err := user.Parse(w, r)
-		if err != nil {
-			http.Error(w, "Error decoding request body", http.StatusBadRequest)
-			return
-		}
-
-		err = user.Validate()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		err = user.Save(db)
-		if err != nil {
-			http.Error(w, "Error saving user to DB", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusCreated)
-	})
+	mux.HandleFunc("POST /api/auth/register", user.RegisterationHandler(db))
 	return mux
 }

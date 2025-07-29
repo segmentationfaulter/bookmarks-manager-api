@@ -28,6 +28,29 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+func RegisterationHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, err := Parse(w, r)
+		if err != nil {
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			return
+		}
+
+		err = user.Validate()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		err = user.Save(db)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
 func Parse(w http.ResponseWriter, r *http.Request) (User, error) {
 	user := User{}
 	err := json.NewDecoder(r.Body).Decode(&user)
