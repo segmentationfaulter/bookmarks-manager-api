@@ -3,10 +3,20 @@ package user
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/mail"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
+)
+
+const (
+	MAX_USERNAME_LENGTH = 50
+	MIN_USERNAME_LENGTH = 3
+	MIN_PASSWORD_LENGTH = 8
 )
 
 type User struct {
@@ -18,7 +28,7 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func ParseUser(w http.ResponseWriter, r *http.Request) (User, error) {
+func Parse(w http.ResponseWriter, r *http.Request) (User, error) {
 	user := User{}
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
@@ -28,10 +38,25 @@ func ParseUser(w http.ResponseWriter, r *http.Request) (User, error) {
 	return user, nil
 }
 
-// TODO: add validation
-func (u User) Validate() {}
+func (u *User) Validate() error {
+	u.Username = strings.TrimSpace(u.Username)
+	if len := utf8.RuneCountInString(u.Username); len < MIN_USERNAME_LENGTH || len > MAX_USERNAME_LENGTH {
+		return fmt.Errorf("Username should be no longer than %d characters and less than %d", MAX_USERNAME_LENGTH, MIN_USERNAME_LENGTH)
+	}
 
-func (u User) Save(db *sql.DB) error {
+	u.Email = strings.TrimSpace(u.Email)
+	if _, err := mail.ParseAddress(u.Email); err != nil {
+		return fmt.Errorf("Invalid email address: %s", u.Email)
+	}
+
+	if len := utf8.RuneCountInString(u.Password); len < MIN_PASSWORD_LENGTH {
+		return fmt.Errorf("Password should not be less than %d characters", MIN_PASSWORD_LENGTH)
+	}
+
+	return nil
+}
+
+func (u *User) Save(db *sql.DB) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
