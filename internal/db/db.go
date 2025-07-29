@@ -25,7 +25,6 @@ func InitDatabase() (*sql.DB, error) {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 	CREATE TRIGGER IF NOT EXISTS update_users_updated_at
 		AFTER UPDATE ON users

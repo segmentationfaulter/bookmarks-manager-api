@@ -28,21 +28,69 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func RegisterationHandler(db *sql.DB) http.HandlerFunc {
+func LoginHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, err := Parse(w, r)
+		user, err := parse(r)
 		if err != nil {
 			http.Error(w, "Error decoding request body", http.StatusBadRequest)
 			return
 		}
 
-		err = user.Validate()
+		if user.Username == "" || user.Password == "" {
+			http.Error(w, "Invalid login credentials", http.StatusBadRequest)
+			return
+		}
+
+		stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer stmt.Close()
+
+		var savedUser = User{}
+
+		err = stmt.QueryRow(user.Username).Scan(
+			&savedUser.Id,
+			&savedUser.Username,
+			&savedUser.Email,
+			&savedUser.Password,
+			&savedUser.CreatedAt,
+			&savedUser.UpdatedAt,
+		)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = bcrypt.CompareHashAndPassword([]byte(savedUser.Password), []byte(user.Password))
+		if err != nil {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func RegisterationHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, err := parse(r)
+		if err != nil {
+			http.Error(w, "Error decoding request body", http.StatusBadRequest)
+			return
+		}
+
+		err = user.validate()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		err = user.Save(db)
+		err = user.save(db)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -51,7 +99,7 @@ func RegisterationHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func Parse(w http.ResponseWriter, r *http.Request) (User, error) {
+func parse(r *http.Request) (User, error) {
 	user := User{}
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
@@ -61,7 +109,7 @@ func Parse(w http.ResponseWriter, r *http.Request) (User, error) {
 	return user, nil
 }
 
-func (u *User) Validate() error {
+func (u *User) validate() error {
 	u.Username = strings.TrimSpace(u.Username)
 	if len := utf8.RuneCountInString(u.Username); len < MIN_USERNAME_LENGTH || len > MAX_USERNAME_LENGTH {
 		return fmt.Errorf("Username should be no longer than %d characters and less than %d", MAX_USERNAME_LENGTH, MIN_USERNAME_LENGTH)
@@ -79,7 +127,7 @@ func (u *User) Validate() error {
 	return nil
 }
 
-func (u *User) Save(db *sql.DB) error {
+func (u *User) save(db *sql.DB) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
