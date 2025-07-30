@@ -5,11 +5,16 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/joho/godotenv"
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/db"
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/user"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Unable to load environment variables")
+	}
 	db, err := db.InitDatabase()
 	if err != nil {
 		log.Fatal(err)

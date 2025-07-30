@@ -2,15 +2,18 @@ package user
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -57,9 +60,32 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
+
+		signingKey := os.Getenv("JWT_SIGNING_KEY_HEX")
+		if signingKey == "" {
+			panic("JWT signing key not set")
+		}
+		key, err := hex.DecodeString(signingKey)
+		if err != nil {
+			panic("Decoding of JWT signing key failed")
+		}
+
+		token, err := jwt.
+			NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+				"sub": savedUser.Id,
+			}).
+			SignedString(key)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(savedUser.public())
-		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(struct {
+			User  PublicUser `json:"user"`
+			Token string     `json:"token"`
+		}{User: savedUser.public(), Token: token})
 	}
 }
 
