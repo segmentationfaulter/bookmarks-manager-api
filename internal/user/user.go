@@ -3,6 +3,7 @@ package user
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
@@ -41,29 +42,9 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+		savedUser, status, err := user.find(db)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer stmt.Close()
-
-		var savedUser = User{}
-
-		err = stmt.QueryRow(user.Username).Scan(
-			&savedUser.Id,
-			&savedUser.Username,
-			&savedUser.Email,
-			&savedUser.Password,
-			&savedUser.CreatedAt,
-			&savedUser.UpdatedAt,
-		)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), status)
 			return
 		}
 
@@ -142,4 +123,31 @@ func (u *User) save(db *sql.DB) error {
 		return err
 	}
 	return nil
+}
+
+func (u *User) find(db *sql.DB) (*User, int, error) {
+	stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	defer stmt.Close()
+
+	var savedUser = User{}
+
+	err = stmt.QueryRow(u.Username).Scan(
+		&savedUser.Id,
+		&savedUser.Username,
+		&savedUser.Email,
+		&savedUser.Password,
+		&savedUser.CreatedAt,
+		&savedUser.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, http.StatusUnauthorized, errors.New("Invalid credentials")
+		}
+		return nil, http.StatusInternalServerError, err
+	}
+
+	return &savedUser, http.StatusOK, nil
 }
