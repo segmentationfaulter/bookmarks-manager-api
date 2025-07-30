@@ -20,13 +20,17 @@ const (
 	MIN_PASSWORD_LENGTH = 8
 )
 
-type User struct {
+type PublicUser struct {
 	Id        int       `json:"id"`
 	Username  string    `json:"username"`
 	Email     string    `json:"email"`
-	Password  string    `json:"password"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type User struct {
+	PublicUser
+	Password string
 }
 
 func LoginHandler(db *sql.DB) http.HandlerFunc {
@@ -53,6 +57,8 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 			return
 		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(savedUser.public())
 		w.WriteHeader(http.StatusOK)
 	}
 }
@@ -150,4 +156,14 @@ func (u *User) find(db *sql.DB) (*User, int, error) {
 	}
 
 	return &savedUser, http.StatusOK, nil
+}
+
+func (u *User) public() PublicUser {
+	return PublicUser{
+		Id:        u.Id,
+		Username:  u.Username,
+		Email:     u.Email,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
 }
