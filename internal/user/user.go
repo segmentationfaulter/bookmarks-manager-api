@@ -2,13 +2,14 @@ package user
 
 import (
 	"database/sql"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -16,6 +17,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type QueryRunner func() (*sql.Row, error)
 
 const (
 	MAX_USERNAME_LENGTH = 50
@@ -36,6 +39,41 @@ type User struct {
 	Password string
 }
 
+func ProfileHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		tokenStr, ok := bearerToken(r)
+		if !ok {
+			http.Error(w, "Missing/malformed token", http.StatusUnauthorized)
+			return
+		}
+
+		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return signingKey(), nil
+		})
+		if err != nil {
+			http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		userId, err := token.Claims.GetSubject()
+		if err != nil {
+			http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+		user, status, err := find(findUserById(db, userId))
+		if err != nil {
+			http.Error(w, err.Error(), status)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user.public())
+	}
+}
+
 func LoginHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, err := parse(r)
@@ -49,7 +87,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		savedUser, status, err := user.find(db)
+		savedUser, status, err := find(findUserByUsername(db, user.Username))
 		if err != nil {
 			http.Error(w, err.Error(), status)
 			return
@@ -61,20 +99,11 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		signingKey := os.Getenv("JWT_SIGNING_KEY_HEX")
-		if signingKey == "" {
-			panic("JWT signing key not set")
-		}
-		key, err := hex.DecodeString(signingKey)
-		if err != nil {
-			panic("Decoding of JWT signing key failed")
-		}
-
 		token, err := jwt.
 			NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-				"sub": savedUser.Id,
+				"sub": strconv.Itoa(savedUser.Id),
 			}).
-			SignedString(key)
+			SignedString(signingKey())
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -157,22 +186,20 @@ func (u *User) save(db *sql.DB) error {
 	return nil
 }
 
-func (u *User) find(db *sql.DB) (*User, int, error) {
-	stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+func find(queryRunner QueryRunner) (*User, int, error) {
+	row, err := queryRunner()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	defer stmt.Close()
 
-	var savedUser = User{}
-
-	err = stmt.QueryRow(u.Username).Scan(
-		&savedUser.Id,
-		&savedUser.Username,
-		&savedUser.Email,
-		&savedUser.Password,
-		&savedUser.CreatedAt,
-		&savedUser.UpdatedAt,
+	var user = User{}
+	err = row.Scan(
+		&user.Id,
+		&user.Username,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt,
+		&user.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -181,7 +208,7 @@ func (u *User) find(db *sql.DB) (*User, int, error) {
 		return nil, http.StatusInternalServerError, err
 	}
 
-	return &savedUser, http.StatusOK, nil
+	return &user, http.StatusOK, nil
 }
 
 func (u *User) public() PublicUser {
@@ -191,5 +218,48 @@ func (u *User) public() PublicUser {
 		Email:     u.Email,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
+	}
+}
+
+func bearerToken(r *http.Request) (string, bool) {
+	const prefix = "Bearer "
+	auth := r.Header.Get("Authorization")
+	if auth == "" || !strings.HasPrefix(auth, prefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(auth, prefix), true
+}
+
+func signingKey() []byte {
+	keyStr := os.Getenv("JWT_SIGNING_KEY")
+	if keyStr == "" {
+		panic("JWT signing key not set")
+	}
+	key, err := base64.StdEncoding.DecodeString(keyStr)
+	if err != nil {
+		panic("Decoding of JWT signing key failed")
+	}
+	return key
+}
+
+func findUserByUsername(db *sql.DB, username string) QueryRunner {
+	return func() (*sql.Row, error) {
+		stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+
+		if err != nil {
+			return nil, err
+		}
+		return stmt.QueryRow(username), nil
+	}
+}
+
+func findUserById(db *sql.DB, id string) QueryRunner {
+	return func() (*sql.Row, error) {
+		stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE id= ?")
+
+		if err != nil {
+			return nil, err
+		}
+		return stmt.QueryRow(id), nil
 	}
 }
