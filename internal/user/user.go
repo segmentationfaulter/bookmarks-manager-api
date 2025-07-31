@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/segmentationfaulter/bookmarks-manager-api/internal/utils"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -82,7 +83,7 @@ func ProfileHandler(db *sql.DB) http.HandlerFunc {
 
 func LoginHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, err := parse(r)
+		user, err := utils.DecodeRequestBody[User](r)
 		if err != nil {
 			http.Error(w, "Error decoding request body", http.StatusBadRequest)
 			return
@@ -126,7 +127,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 
 func RegisterationHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, err := parse(r)
+		user, err := utils.DecodeRequestBody[User](r)
 		if err != nil {
 			http.Error(w, "Error decoding request body", http.StatusBadRequest)
 			return
@@ -145,16 +146,6 @@ func RegisterationHandler(db *sql.DB) http.HandlerFunc {
 		}
 		w.WriteHeader(http.StatusCreated)
 	}
-}
-
-func parse(r *http.Request) (User, error) {
-	user := User{}
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		return User{}, err
-	}
-
-	return user, nil
 }
 
 func (u *User) validate() error {
