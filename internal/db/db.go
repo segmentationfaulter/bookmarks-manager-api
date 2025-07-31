@@ -24,7 +24,22 @@ func InitDatabase() (*sql.DB, error) {
 		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS bookmarks (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		url TEXT NOT NULL UNIQUE,
+		title VARCHAR(500),
+		description VARCHAR(2000),
+		notes TEXT,
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	    UNIQUE(user_id, url)
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+	CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
+	CREATE INDEX IF NOT EXISTS idx_bookmarks_url ON bookmarks(url);
 
 	CREATE TRIGGER IF NOT EXISTS update_users_updated_at
 		AFTER UPDATE ON users
@@ -32,6 +47,14 @@ func InitDatabase() (*sql.DB, error) {
 		WHEN NEW.updated_at = OLD.updated_at
 	BEGIN
 		UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS update_bookmarks_updated_at
+	    AFTER UPDATE ON bookmarks
+	    FOR EACH ROW
+	    WHEN NEW.updated_at = OLD.updated_at
+	BEGIN
+	    UPDATE bookmarks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 	END;
 	`
 
