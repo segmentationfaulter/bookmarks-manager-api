@@ -1,4 +1,4 @@
-package db
+package utils
 
 import (
 	"database/sql"
@@ -6,6 +6,11 @@ import (
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
+)
+
+const (
+	CREATE_BOOKMARK = `INSERT INTO bookmarks (user_id, url, title, description, notes) VALUES(?, ?, ?, ?, ?)`
+	CREATE_USER     = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)`
 )
 
 func InitDatabase() (*sql.DB, error) {
@@ -65,4 +70,17 @@ func InitDatabase() (*sql.DB, error) {
 
 	log.Println("Database initialized successfully")
 	return db, nil
+}
+
+func Exec(db *sql.DB, query string, args ...any) error {
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(args...)
+	if err != nil {
+		return err
+	}
+	return nil
 }

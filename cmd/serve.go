@@ -6,8 +6,9 @@ import (
 	"net/http"
 
 	"github.com/joho/godotenv"
-	"github.com/segmentationfaulter/bookmarks-manager-api/internal/db"
+	"github.com/segmentationfaulter/bookmarks-manager-api/internal/bookmarks"
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/user"
+	"github.com/segmentationfaulter/bookmarks-manager-api/internal/utils"
 )
 
 func main() {
@@ -15,7 +16,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Unable to load environment variables")
 	}
-	db, err := db.InitDatabase()
+	db, err := utils.InitDatabase()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,5 +28,6 @@ func Mux(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("POST /api/auth/register", user.RegisterationHandler(db))
 	mux.HandleFunc("POST /api/auth/login", user.LoginHandler(db))
 	mux.HandleFunc("GET /api/auth/me", user.ProfileHandler(db))
+	mux.HandleFunc("POST /api/bookmarks", bookmarks.CreateBookmark(db))
 	return mux
 }

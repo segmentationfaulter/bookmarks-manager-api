@@ -2,13 +2,11 @@ package user
 
 import (
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -48,29 +46,12 @@ type User struct {
 
 func ProfileHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tokenStr, ok := bearerToken(r)
-		if !ok {
-			http.Error(w, "Missing/malformed token", http.StatusUnauthorized)
-			return
-		}
-
-		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-			if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-			}
-			return signingKey(), nil
-		})
+		userId, status, err := utils.IsAuthenticated(r)
 		if err != nil {
 			http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
-
-		userId, err := token.Claims.GetSubject()
-		if err != nil {
-			http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
-			return
-		}
-		user, status, err := find(findUser(db, SEARCH_BY_ID, userId))
+		user, status, err := find(findUser(db, SEARCH_BY_ID, string(userId)))
 		if err != nil {
 			http.Error(w, err.Error(), status)
 			return
@@ -110,7 +91,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"sub": strconv.Itoa(savedUser.Id),
 			}).
-			SignedString(signingKey())
+			SignedString(utils.SigningKey())
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -171,16 +152,7 @@ func (u *User) save(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	stmt, err := db.Prepare("INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec(u.Username, u.Email, hash)
-	if err != nil {
-		return err
-	}
-	return nil
+	return utils.Exec(db, utils.CREATE_USER, u.Username, u.Email, string(hash))
 }
 
 func find(queryRunner QueryRunner) (*User, int, error) {
@@ -216,27 +188,6 @@ func (u *User) public() PublicUser {
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}
-}
-
-func bearerToken(r *http.Request) (string, bool) {
-	const prefix = "Bearer "
-	auth := r.Header.Get("Authorization")
-	if auth == "" || !strings.HasPrefix(auth, prefix) {
-		return "", false
-	}
-	return strings.TrimPrefix(auth, prefix), true
-}
-
-func signingKey() []byte {
-	keyStr := os.Getenv("JWT_SIGNING_KEY")
-	if keyStr == "" {
-		panic("JWT signing key not set")
-	}
-	key, err := base64.StdEncoding.DecodeString(keyStr)
-	if err != nil {
-		panic("Decoding of JWT signing key failed")
-	}
-	return key
 }
 
 func findUser(db *sql.DB, searchFlag SearchFlag, queryValue string) QueryRunner {
