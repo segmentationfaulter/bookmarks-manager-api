@@ -99,7 +99,7 @@ func FindOne[T any](queryRunner QueryRunner, rowScanner func(*sql.Row) (*T, erro
 	result, err := rowScanner(row)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, http.StatusUnauthorized, errors.New("Invalid credentials")
+			return nil, http.StatusNotFound, errors.New(http.StatusText(http.StatusNotFound))
 		}
 		return nil, http.StatusInternalServerError, err
 	}
