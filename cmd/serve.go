@@ -29,5 +29,6 @@ func Mux(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("POST /api/auth/login", user.LoginHandler(db))
 	mux.HandleFunc("GET /api/auth/me", user.ProfileHandler(db))
 	mux.HandleFunc("POST /api/bookmarks", bookmarks.CreateBookmark(db))
+	mux.HandleFunc("GET /api/bookmarks/{id}", bookmarks.GetBookmark(db))
 	return mux
 }

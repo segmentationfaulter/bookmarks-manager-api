@@ -2,15 +2,20 @@ package utils
 
 import (
 	"database/sql"
+	"errors"
 	"log"
+	"net/http"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
 )
 
+type QueryRunner func() (*sql.Row, error)
+
 const (
-	CREATE_BOOKMARK = `INSERT INTO bookmarks (user_id, url, title, description, notes) VALUES(?, ?, ?, ?, ?)`
-	CREATE_USER     = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)`
+	CREATE_BOOKMARK    = `INSERT INTO bookmarks (user_id, url, title, description, notes) VALUES(?, ?, ?, ?, ?)`
+	CREATE_USER        = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)`
+	GET_BOOKMARK_BY_ID = `SELECT id, url, title, description, notes, created_at, updated_at FROM bookmarks WHERE id = ?`
 )
 
 func InitDatabase() (*sql.DB, error) {
@@ -83,4 +88,21 @@ func Exec(db *sql.DB, query string, args ...any) error {
 		return err
 	}
 	return nil
+}
+
+func FindOne[T any](queryRunner QueryRunner, rowScanner func(*sql.Row) (*T, error)) (*T, int, error) {
+	row, err := queryRunner()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+
+	result, err := rowScanner(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, http.StatusUnauthorized, errors.New("Invalid credentials")
+		}
+		return nil, http.StatusInternalServerError, err
+	}
+
+	return result, http.StatusOK, nil
 }
