@@ -19,11 +19,17 @@ import (
 )
 
 type QueryRunner func() (*sql.Row, error)
+type SearchFlag uint8
 
 const (
 	MAX_USERNAME_LENGTH = 50
 	MIN_USERNAME_LENGTH = 3
 	MIN_PASSWORD_LENGTH = 8
+)
+
+const (
+	SEARCH_BY_USERNAME SearchFlag = 1 << iota
+	SEARCH_BY_ID
 )
 
 type PublicUser struct {
@@ -63,7 +69,7 @@ func ProfileHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
-		user, status, err := find(findUserById(db, userId))
+		user, status, err := find(findUser(db, SEARCH_BY_ID, userId))
 		if err != nil {
 			http.Error(w, err.Error(), status)
 			return
@@ -87,7 +93,7 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		savedUser, status, err := find(findUserByUsername(db, user.Username))
+		savedUser, status, err := find(findUser(db, SEARCH_BY_USERNAME, user.Username))
 		if err != nil {
 			http.Error(w, err.Error(), status)
 			return
@@ -242,24 +248,20 @@ func signingKey() []byte {
 	return key
 }
 
-func findUserByUsername(db *sql.DB, username string) QueryRunner {
+func findUser(db *sql.DB, searchFlag SearchFlag, queryValue string) QueryRunner {
 	return func() (*sql.Row, error) {
-		stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+		var stmt *sql.Stmt
+		var err error
+
+		if searchFlag&SEARCH_BY_USERNAME != 0 {
+			stmt, err = db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE username= ?")
+		} else if searchFlag&SEARCH_BY_ID != 0 {
+			stmt, err = db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE id= ?")
+		}
 
 		if err != nil {
 			return nil, err
 		}
-		return stmt.QueryRow(username), nil
-	}
-}
-
-func findUserById(db *sql.DB, id string) QueryRunner {
-	return func() (*sql.Row, error) {
-		stmt, err := db.Prepare("SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE id= ?")
-
-		if err != nil {
-			return nil, err
-		}
-		return stmt.QueryRow(id), nil
+		return stmt.QueryRow(queryValue), nil
 	}
 }
