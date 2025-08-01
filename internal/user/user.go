@@ -150,7 +150,10 @@ func (u *User) save(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	return utils.Exec(db, utils.CREATE_USER, u.Username, u.Email, string(hash))
+	if _, err := utils.Exec(db, utils.CREATE_USER, u.Username, u.Email, string(hash)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func userScanner(row *sql.Row) (*User, error) {

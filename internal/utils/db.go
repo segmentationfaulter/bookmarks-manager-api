@@ -12,6 +12,10 @@ import (
 
 type QueryRunner func() (*sql.Row, error)
 
+type Execer interface {
+	Prepare(query string) (*sql.Stmt, error)
+}
+
 const (
 	CREATE_BOOKMARK    = `INSERT INTO bookmarks (user_id, url, title, description, notes) VALUES(?, ?, ?, ?, ?)`
 	CREATE_USER        = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)`
@@ -37,7 +41,7 @@ func InitDatabase() (*sql.DB, error) {
 	CREATE TABLE IF NOT EXISTS bookmarks (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
-		url TEXT NOT NULL UNIQUE,
+		url TEXT NOT NULL UNIQUE CHECK(url <> ''),
 		title VARCHAR(500),
 		description VARCHAR(2000),
 		notes TEXT,
@@ -47,9 +51,28 @@ func InitDatabase() (*sql.DB, error) {
 	    UNIQUE(user_id, url)
 	);
 
+	CREATE TABLE IF NOT EXISTS tags (
+	    id INTEGER PRIMARY KEY AUTOINCREMENT,
+	    user_id INTEGER NOT NULL,
+	    name VARCHAR(50) NOT NULL CHECK(name <> ''),
+	    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	    UNIQUE(user_id, name)
+	);
+
+	CREATE TABLE IF NOT EXISTS bookmark_tags (
+	    bookmark_id INTEGER NOT NULL,
+	    tag_id INTEGER NOT NULL,
+	    PRIMARY KEY (bookmark_id, tag_id),
+	    FOREIGN KEY (bookmark_id) REFERENCES bookmarks(id) ON DELETE CASCADE,
+	    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 	CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
 	CREATE INDEX IF NOT EXISTS idx_bookmarks_url ON bookmarks(url);
+	CREATE INDEX IF NOT EXISTS idx_tags_user_id ON tags(user_id);
+	CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 
 	CREATE TRIGGER IF NOT EXISTS update_users_updated_at
 		AFTER UPDATE ON users
@@ -77,17 +100,17 @@ func InitDatabase() (*sql.DB, error) {
 	return db, nil
 }
 
-func Exec(db *sql.DB, query string, args ...any) error {
+func Exec(db Execer, query string, args ...any) (sql.Result, error) {
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(args...)
+	result, err := stmt.Exec(args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return result, nil
 }
 
 func FindOne[T any](queryRunner QueryRunner, rowScanner func(*sql.Row) (*T, error)) (*T, int, error) {

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/segmentationfaulter/bookmarks-manager-api/internal/tags"
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/utils"
 )
 
@@ -53,7 +54,10 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		bookmark, err := utils.DecodeRequestBody[Bookmark](r)
+		bookmark, err := utils.DecodeRequestBody[struct {
+			Bookmark
+			Tags []string
+		}](r)
 		if err != nil {
 			http.Error(w, "Error decoding request: "+err.Error(), http.StatusBadRequest)
 			return
@@ -64,10 +68,52 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if err := utils.Exec(db, utils.CREATE_BOOKMARK, userId, bookmark.Url, bookmark.Title, bookmark.Description, bookmark.Notes); err != nil {
+		tx, err := db.Begin()
+
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Couldn't start transaction: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := tags.CreateTags(tx, bookmark.Tags, string(userId)); err != nil {
+			tx.Rollback()
+			http.Error(w, "Error creating tags: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		bookmarksExecResult, err := utils.Exec(tx, utils.CREATE_BOOKMARK, userId, bookmark.Url, bookmark.Title, bookmark.Description, bookmark.Notes)
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Error creating bookmark"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		bookmarkId, err := bookmarksExecResult.LastInsertId()
+		if err != nil {
+			tx.Rollback()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		savedTags, err := tags.GetTags(tx, bookmark.Tags, string(userId))
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Error getting tags Ids"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = tags.UpdateBookmarkTags(tx, bookmarkId, tags.TagIds(savedTags))
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Error updating boookmark_tags table"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		w.WriteHeader(http.StatusCreated)
 	}
 }
