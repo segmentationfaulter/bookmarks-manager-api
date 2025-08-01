@@ -14,9 +14,9 @@ import (
 type Bookmark struct {
 	Id          int       `json:"id"`
 	Url         string    `json:"url"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Notes       string    `json:"notes"`
+	Title       string    `json:"title,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Notes       string    `json:"notes,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -34,7 +34,7 @@ func GetBookmark(db *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), httpStatus)
 			return
 		}
-		bookmark, httpStatus, err := utils.FindOne(findBookmark(db, string(userId)), bookmarkScanner)
+		bookmark, httpStatus, err := utils.FindOne(findBookmark(db, id, string(userId)), bookmarkScanner)
 		if err != nil {
 			http.Error(w, err.Error(), httpStatus)
 			return
@@ -72,14 +72,14 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func findBookmark(db *sql.DB, id string) utils.QueryRunner {
+func findBookmark(db *sql.DB, id string, userId string) utils.QueryRunner {
 	return func() (*sql.Row, error) {
 		stmt, err := db.Prepare(utils.GET_BOOKMARK_BY_ID)
 
 		if err != nil {
 			return nil, err
 		}
-		return stmt.QueryRow(id), nil
+		return stmt.QueryRow(id, userId), nil
 	}
 }
 
