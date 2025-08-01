@@ -1,7 +1,6 @@
 package tags
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -26,22 +25,14 @@ func CreateTags(tx utils.Execer, tags []string, userId string) error {
 	}
 	query = query + " " + strings.Join(placeholders, ", ") + ";"
 
-	stmt, err := tx.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
 	var args []any
 	for _, tag := range tags {
 		args = append(args, userId, tag)
 	}
 
-	_, err = stmt.Exec(args...)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := utils.Exec(tx, query, args...)
+
+	return err
 }
 
 func GetTags(execer utils.Execer, tags []string, userId string) ([]Tag, error) {
@@ -55,8 +46,6 @@ func GetTags(execer utils.Execer, tags []string, userId string) ([]Tag, error) {
 		placeholders[i] = "?"
 	}
 	query = query + strings.Join(placeholders, ", ") + ")"
-
-	fmt.Println(query)
 
 	args := []any{userId}
 	for _, tag := range tags {
@@ -98,22 +87,14 @@ func UpdateBookmarkTags(execer utils.Execer, bookmarkId int64, tagIds []int) err
 	}
 
 	query = query + strings.Join(placeholders, ",")
-	stmt, err := execer.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
 
 	var args []any
 	for _, tagId := range tagIds {
 		args = append(args, bookmarkId, tagId)
 	}
 
-	_, err = stmt.Exec(args...)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := utils.Exec(execer, query, args...)
+	return err
 }
 
 func TagIds(tags []Tag) []int {
