@@ -35,7 +35,7 @@ type Bookmark struct {
 
 type BookmarkWithTag struct {
 	Bookmark
-	Tag string
+	Tag string `json:"tag"`
 }
 
 func GetBookmarksList(db *sql.DB) http.HandlerFunc {
@@ -179,8 +179,14 @@ func bookmarkScanner(row *sql.Row) (*Bookmark, error) {
 	return bookmark, err
 }
 
-func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) ([]BookmarkWithTag, error) {
-	search := queryParams.search
+func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string {
+	var search string
+	if queryParams.search == "" {
+		search = "1=1"
+	} else {
+		search = "title LIKE ? OR description LIKE ? OR notes LIKE ?"
+	}
+
 	query := fmt.Sprintf(`
 		SELECT DISTINCT b.id, b.url, b.title, b.description, b.notes, b.created_at, b.updated_at, t.name
 		FROM bookmarks b
@@ -188,16 +194,23 @@ func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) 
 		ON b.id = b_t.bookmark_id
 		LEFT JOIN tags t
 		ON b_t.tag_id = t.id
-		AND t.user_id = %s
 		WHERE b.user_id = %s
-		  AND (title LIKE ?
-		  OR description LIKE ?
-		  OR notes LIKE ?)
+		  AND (%s)
 		ORDER BY %s %s
 		LIMIT ? OFFSET ?;`,
-		userID, userID, queryParams.sort, queryParams.order)
+		userID, search, queryParams.sort, queryParams.order)
+	return query
+}
 
-	args := []any{"%" + search + "%", "%" + search + "%", "%" + search + "%", queryParams.limit, queryParams.limit * (queryParams.page - 1)}
+func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) ([]BookmarkWithTag, error) {
+	search := queryParams.search
+	query := bookmarksListQuery(userID, queryParams)
+
+	args := []any{}
+	if search != "" {
+		args = append(args, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+	}
+	args = append(args, queryParams.limit, queryParams.limit*(queryParams.page-1))
 
 	stmt, err := db.Prepare(query)
 	if err != nil {
@@ -210,6 +223,7 @@ func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) 
 	}
 	defer rows.Close()
 
+	var tag sql.NullString
 	var result []BookmarkWithTag
 
 	for rows.Next() {
@@ -222,9 +236,13 @@ func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) 
 			&bookmark.Notes,
 			&bookmark.CreatedAt,
 			&bookmark.UpdatedAt,
-			&bookmark.Tag,
+			&tag,
 		); err != nil {
 			return nil, err
+		}
+
+		if tag.Valid {
+			bookmark.Tag = tag.String
 		}
 		result = append(result, bookmark)
 	}
