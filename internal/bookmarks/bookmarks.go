@@ -160,31 +160,6 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func findBookmark(db *sql.DB, id string, userId string) utils.QueryRunner {
-	return func() (*sql.Row, error) {
-		stmt, err := db.Prepare(utils.GET_BOOKMARK_BY_ID)
-
-		if err != nil {
-			return nil, err
-		}
-		return stmt.QueryRow(id, userId), nil
-	}
-}
-
-func bookmarkScanner(row *sql.Row) (*Bookmark, error) {
-	bookmark := new(Bookmark)
-	err := row.Scan(
-		&bookmark.Id,
-		&bookmark.Url,
-		&bookmark.Title,
-		&bookmark.Description,
-		&bookmark.Notes,
-		&bookmark.CreatedAt,
-		&bookmark.UpdatedAt,
-	)
-	return bookmark, err
-}
-
 func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string {
 	var search string
 	if queryParams.search == "" {
