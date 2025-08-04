@@ -196,7 +196,7 @@ func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string 
 		ON b_t.tag_id = t.id
 		WHERE b.user_id = %s
 		  AND (%s)
-		ORDER BY %s %s
+		ORDER BY b.%s %s
 		LIMIT ? OFFSET ?;`,
 		userID, search, queryParams.sort, queryParams.order)
 	return query
@@ -254,7 +254,7 @@ func getQueryParams(r *http.Request) BookmarksQueryParams {
 	defaultParams := BookmarksQueryParams{
 		page:  1,
 		limit: 20,
-		sort:  "b.created_at",
+		sort:  "created_at",
 		order: "desc",
 		tags:  []string{},
 	}
