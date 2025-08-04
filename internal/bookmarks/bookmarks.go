@@ -3,14 +3,25 @@ package bookmarks
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/tags"
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/utils"
 )
+
+type BookmarksQueryParams struct {
+	page   int
+	limit  int
+	tags   []string
+	search string
+	sort   string
+	order  string
+}
 
 type Bookmark struct {
 	Id          int       `json:"id"`
@@ -22,6 +33,31 @@ type Bookmark struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type BookmarkWithTag struct {
+	Bookmark
+	Tag string
+}
+
+func GetBookmarksList(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userId, httpStatus, err := utils.IsAuthenticated(r)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+		queryParams := getQueryParams(r)
+		bookmarks, err := bookmarksList(db, string(userId), queryParams)
+		if err != nil {
+			http.Error(w, "Error getting bookmarks: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(bookmarks)
+	}
+}
+
+// TODO: We need to include tags here
 func GetBookmark(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
@@ -141,4 +177,90 @@ func bookmarkScanner(row *sql.Row) (*Bookmark, error) {
 		&bookmark.UpdatedAt,
 	)
 	return bookmark, err
+}
+
+func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) ([]BookmarkWithTag, error) {
+	search := queryParams.search
+	query := fmt.Sprintf(`
+		SELECT DISTINCT b.id, b.url, b.title, b.description, b.notes, b.created_at, b.updated_at, t.name
+		FROM bookmarks b
+		LEFT JOIN bookmark_tags b_t
+		ON b.id = b_t.bookmark_id
+		LEFT JOIN tags t
+		ON b_t.tag_id = t.id
+		AND t.user_id = %s
+		WHERE b.user_id = %s
+		  AND (title LIKE ?
+		  OR description LIKE ?
+		  OR notes LIKE ?)
+		ORDER BY %s %s
+		LIMIT ? OFFSET ?;`,
+		userID, userID, queryParams.sort, queryParams.order)
+
+	args := []any{"%" + search + "%", "%" + search + "%", "%" + search + "%", queryParams.limit, queryParams.limit * (queryParams.page - 1)}
+
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []BookmarkWithTag
+
+	for rows.Next() {
+		bookmark := BookmarkWithTag{}
+		if err := rows.Scan(
+			&bookmark.Id,
+			&bookmark.Url,
+			&bookmark.Title,
+			&bookmark.Description,
+			&bookmark.Notes,
+			&bookmark.CreatedAt,
+			&bookmark.UpdatedAt,
+			&bookmark.Tag,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, bookmark)
+	}
+
+	return result, rows.Err()
+}
+
+func getQueryParams(r *http.Request) BookmarksQueryParams {
+	defaultParams := BookmarksQueryParams{
+		page:  1,
+		limit: 20,
+		sort:  "b.created_at",
+		order: "desc",
+		tags:  []string{},
+	}
+	if page, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil {
+		defaultParams.page = page
+	}
+
+	if limit, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil {
+		defaultParams.limit = limit
+	}
+
+	if tags := strings.Split(r.URL.Query().Get("tags"), ","); len(tags) > 0 {
+		defaultParams.tags = tags
+	}
+
+	defaultParams.search = r.URL.Query().Get("search")
+
+	if sort := r.URL.Query().Get("sort"); sort == "updated_at" || sort == "title" || sort == "url" {
+		defaultParams.sort = sort
+	}
+
+	if order := r.URL.Query().Get("order"); order == "asc" {
+		defaultParams.order = order
+	}
+
+	return defaultParams
 }
