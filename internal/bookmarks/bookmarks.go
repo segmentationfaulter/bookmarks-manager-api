@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,11 @@ type BookmarkWithTag struct {
 	Tag string `json:"tag"`
 }
 
+type BookmarkWithTags struct {
+	Bookmark
+	Tags []string `json:"tags"`
+}
+
 func GetBookmarksList(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userId, httpStatus, err := utils.IsAuthenticated(r)
@@ -53,7 +59,7 @@ func GetBookmarksList(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(bookmarks)
+		json.NewEncoder(w).Encode(normalizeBookmarks(bookmarks))
 	}
 }
 
@@ -200,6 +206,35 @@ func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string 
 		LIMIT ? OFFSET ?;`,
 		userID, search, queryParams.sort, queryParams.order)
 	return query
+}
+
+func normalizeBookmarks(bookmarks []BookmarkWithTag) []BookmarkWithTags {
+	var result []BookmarkWithTags
+
+	for _, bookmark := range bookmarks {
+		indexOfExistingBookmark := slices.IndexFunc(result, func(e BookmarkWithTags) bool {
+			return e.Id == bookmark.Id
+		})
+
+		if indexOfExistingBookmark < 0 {
+			if bookmark.Tag == "" {
+				result = append(result, BookmarkWithTags{
+					Bookmark: bookmark.Bookmark,
+					Tags:     nil,
+				})
+			} else {
+				result = append(result, BookmarkWithTags{
+					Bookmark: bookmark.Bookmark,
+					Tags:     []string{bookmark.Tag},
+				})
+			}
+
+		} else {
+			result[indexOfExistingBookmark].Tags = append(result[indexOfExistingBookmark].Tags, bookmark.Tag)
+		}
+	}
+
+	return result
 }
 
 func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) ([]BookmarkWithTag, error) {
