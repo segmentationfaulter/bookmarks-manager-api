@@ -10,8 +10,6 @@ import (
 	_ "github.com/ncruces/go-sqlite3/embed"
 )
 
-type QueryRunner func() (*sql.Row, error)
-
 type Execer interface {
 	Prepare(query string) (*sql.Stmt, error)
 }
@@ -113,7 +111,7 @@ func Exec(db Execer, query string, args ...any) (sql.Result, error) {
 	return result, nil
 }
 
-func FindOne[T any](queryRunner QueryRunner, rowScanner func(*sql.Row) (*T, error)) (*T, int, error) {
+func FindOne[T any](queryRunner func() (*sql.Row, error), rowScanner func(*sql.Row) (*T, error)) (*T, int, error) {
 	row, err := queryRunner()
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
@@ -128,4 +126,19 @@ func FindOne[T any](queryRunner QueryRunner, rowScanner func(*sql.Row) (*T, erro
 	}
 
 	return result, http.StatusOK, nil
+}
+
+func FindMany[T any](
+	queryRunner func() (*sql.Rows, error),
+	scanner func(*sql.Rows) []T,
+) ([]T, error) {
+	rows, err := queryRunner()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := scanner(rows)
+
+	return result, rows.Err()
 }

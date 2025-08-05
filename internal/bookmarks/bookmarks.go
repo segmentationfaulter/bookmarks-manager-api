@@ -77,7 +77,10 @@ func GetBookmark(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		bookmarks, err := bookmarkById(db, string(userId), id)
+		bookmarks, err := utils.FindMany(
+			bookmarkByIdQueryRunner(db, string(userId), id),
+			bookmarkByIdScanner,
+		)
 		if err != nil {
 			http.Error(w, "Error getting bookmark "+err.Error(), http.StatusInternalServerError)
 			return
@@ -183,31 +186,37 @@ func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string 
 	return query
 }
 
-func bookmarkById(db *sql.DB, userId string, bookmarkId string) ([]BookmarkWithTag, error) {
-	query := `
-		SELECT b.id, b.url, b.title, b.description, b.notes, b.created_at, b.updated_at, t.name
-		FROM bookmarks b
-		LEFT JOIN bookmark_tags b_t
-		ON b.id = b_t.bookmark_id
-		LEFT JOIN tags t
-		ON b_t.tag_id = t.id
-		WHERE b.user_id = ?
-		  AND b.id = ?
-	`
+func bookmarkByIdQueryRunner(db *sql.DB, userId, bookmarkId string) func() (*sql.Rows, error) {
+	return func() (*sql.Rows, error) {
+		query := `
+			SELECT b.id, b.url, b.title, b.description, b.notes, b.created_at, b.updated_at, t.name
+			FROM bookmarks b
+			LEFT JOIN bookmark_tags b_t
+			ON b.id = b_t.bookmark_id
+			LEFT JOIN tags t
+			ON b_t.tag_id = t.id
+			WHERE b.user_id = ?
+			  AND b.id = ?
+		`
 
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		return nil, err
+		stmt, err := db.Prepare(query)
+		if err != nil {
+			return nil, err
+		}
+		defer stmt.Close()
+
+		rows, err := db.Query(query, userId, bookmarkId)
+		if err != nil {
+			return nil, err
+		}
+
+		return rows, err
 	}
-	defer stmt.Close()
+}
 
-	rows, err := db.Query(query, userId, bookmarkId)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+func bookmarkByIdScanner(rows *sql.Rows) []BookmarkWithTag {
 	var result []BookmarkWithTag
+
 	for rows.Next() {
 		var bookmark BookmarkWithTag
 		var tag sql.NullString
@@ -229,7 +238,7 @@ func bookmarkById(db *sql.DB, userId string, bookmarkId string) ([]BookmarkWithT
 		result = append(result, bookmark)
 	}
 
-	return result, rows.Err()
+	return result
 }
 
 func normalizeBookmarks(bookmarks []BookmarkWithTag) []BookmarkWithTags {

@@ -179,7 +179,7 @@ func (u *User) public() PublicUser {
 	}
 }
 
-func findUser(db *sql.DB, searchFlag SearchFlag, queryValue string) utils.QueryRunner {
+func findUser(db *sql.DB, searchFlag SearchFlag, queryValue string) func() (*sql.Row, error) {
 	return func() (*sql.Row, error) {
 		var stmt *sql.Stmt
 		var err error
