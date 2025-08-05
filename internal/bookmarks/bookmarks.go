@@ -168,6 +168,18 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 
 func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string {
 	var search string
+	var tagsQuery string
+
+	if len(queryParams.tags) > 0 {
+		placeholders := []string{}
+		for _, _ = range queryParams.tags {
+			placeholders = append(placeholders, "?")
+		}
+		tagsQuery = "t.name IN(" + strings.Join(placeholders, ", ") + ")"
+	} else {
+		tagsQuery = "1=1"
+	}
+
 	if queryParams.search == "" {
 		search = "1=1"
 	} else {
@@ -182,10 +194,12 @@ func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string 
 		LEFT JOIN tags t
 		ON b_t.tag_id = t.id
 		WHERE b.user_id = %s
-		  AND (%s)
+		  AND %s
+		  AND %s
 		ORDER BY b.%s %s
 		LIMIT ? OFFSET ?;`,
-		userID, search, queryParams.sort, queryParams.order)
+		userID, search, tagsQuery, queryParams.sort, queryParams.order)
+
 	return query
 }
 
@@ -288,6 +302,11 @@ func bookmarksListQueryRunner(
 		if search != "" {
 			args = append(args, "%"+search+"%", "%"+search+"%", "%"+search+"%")
 		}
+		if len(queryParams.tags) > 0 {
+			for _, tag := range queryParams.tags {
+				args = append(args, tag)
+			}
+		}
 		args = append(args, queryParams.limit, queryParams.limit*(queryParams.page-1))
 
 		stmt, err := db.Prepare(query)
@@ -321,8 +340,8 @@ func getQueryParams(r *http.Request) BookmarksQueryParams {
 		defaultParams.limit = limit
 	}
 
-	if tags := strings.Split(r.URL.Query().Get("tags"), ","); len(tags) > 0 {
-		defaultParams.tags = tags
+	if tags := r.URL.Query().Get("tags"); len(tags) > 0 {
+		defaultParams.tags = strings.Split(tags, ",")
 	}
 
 	defaultParams.search = r.URL.Query().Get("search")
