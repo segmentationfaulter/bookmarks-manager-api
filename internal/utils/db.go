@@ -15,9 +15,8 @@ type Execer interface {
 }
 
 const (
-	CREATE_BOOKMARK    = `INSERT INTO bookmarks (user_id, url, title, description, notes) VALUES(?, ?, ?, ?, ?)`
-	CREATE_USER        = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)`
-	GET_BOOKMARK_BY_ID = `SELECT id, url, title, description, notes, created_at, updated_at FROM bookmarks WHERE id = ? AND user_id = ?`
+	CREATE_BOOKMARK = `INSERT INTO bookmarks (user_id, url, title, description, notes) VALUES(?, ?, ?, ?, ?)`
+	CREATE_USER     = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?)`
 )
 
 func InitDatabase() (*sql.DB, error) {
