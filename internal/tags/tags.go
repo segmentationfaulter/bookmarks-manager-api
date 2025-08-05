@@ -1,6 +1,7 @@
 package tags
 
 import (
+	"database/sql"
 	"strings"
 	"time"
 
@@ -35,34 +36,29 @@ func CreateTags(tx utils.Execer, tags []string, userId string) error {
 	return err
 }
 
-func GetTags(execer utils.Execer, tags []string, userId string) ([]Tag, error) {
-	if len(tags) == 0 {
-		return []Tag{}, nil
-	}
+func tagsQueryRunner(execer utils.Execer, tags []string, userId string) func() (*sql.Rows, error) {
+	return func() (*sql.Rows, error) {
+		query := "SELECT id, name, created_at FROM tags WHERE user_id = ? AND name IN ("
+		placeholders := make([]string, len(tags))
+		for i := range tags {
+			placeholders[i] = "?"
+		}
+		query = query + strings.Join(placeholders, ", ") + ")"
 
-	query := "SELECT id, name, created_at FROM tags WHERE user_id = ? AND name IN ("
-	placeholders := make([]string, len(tags))
-	for i := range tags {
-		placeholders[i] = "?"
-	}
-	query = query + strings.Join(placeholders, ", ") + ")"
+		args := []any{userId}
+		for _, tag := range tags {
+			args = append(args, tag)
+		}
+		stmt, err := execer.Prepare(query)
+		if err != nil {
+			return nil, err
+		}
 
-	args := []any{userId}
-	for _, tag := range tags {
-		args = append(args, tag)
+		return stmt.Query(args...)
 	}
-	stmt, err := execer.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-	defer stmt.Close()
+}
 
-	rows, err := stmt.Query(args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+func tagsScanner(rows *sql.Rows) ([]Tag, error) {
 	var tagsResult []Tag
 
 	for rows.Next() {
@@ -74,6 +70,14 @@ func GetTags(execer utils.Execer, tags []string, userId string) ([]Tag, error) {
 	}
 
 	return tagsResult, rows.Err()
+}
+
+func GetTags(execer utils.Execer, tags []string, userId string) ([]Tag, error) {
+	if len(tags) == 0 {
+		return []Tag{}, nil
+	}
+
+	return utils.FindMany(tagsQueryRunner(execer, tags, userId), tagsScanner)
 }
 
 func UpdateBookmarkTags(execer utils.Execer, bookmarkId int64, tagIds []int) error {

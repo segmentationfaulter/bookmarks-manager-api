@@ -147,7 +147,7 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 		savedTags, err := tags.GetTags(tx, bookmark.Tags, string(userId))
 		if err != nil {
 			tx.Rollback()
-			http.Error(w, "Error getting tags Ids"+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Error getting tags Ids: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
