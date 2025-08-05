@@ -52,7 +52,10 @@ func GetBookmarksList(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		queryParams := getQueryParams(r)
-		bookmarks, err := bookmarksList(db, string(userId), queryParams)
+		bookmarks, err := utils.FindMany(
+			bookmarksListQueryRunner(db, string(userId), queryParams),
+			bookmarksScanner,
+		)
 		if err != nil {
 			http.Error(w, "Error getting bookmarks: "+err.Error(), http.StatusBadRequest)
 			return
@@ -79,7 +82,7 @@ func GetBookmark(db *sql.DB) http.HandlerFunc {
 
 		bookmarks, err := utils.FindMany(
 			bookmarkByIdQueryRunner(db, string(userId), id),
-			bookmarkByIdScanner,
+			bookmarksScanner,
 		)
 		if err != nil {
 			http.Error(w, "Error getting bookmark "+err.Error(), http.StatusInternalServerError)
@@ -214,7 +217,7 @@ func bookmarkByIdQueryRunner(db *sql.DB, userId, bookmarkId string) func() (*sql
 	}
 }
 
-func bookmarkByIdScanner(rows *sql.Rows) ([]BookmarkWithTag, error) {
+func bookmarksScanner(rows *sql.Rows) ([]BookmarkWithTag, error) {
 	var result []BookmarkWithTag
 
 	for rows.Next() {
@@ -274,52 +277,27 @@ func normalizeBookmarks(bookmarks []BookmarkWithTag) []BookmarkWithTags {
 	return result
 }
 
-func bookmarksList(db *sql.DB, userID string, queryParams BookmarksQueryParams) ([]BookmarkWithTag, error) {
-	search := queryParams.search
-	query := bookmarksListQuery(userID, queryParams)
+func bookmarksListQueryRunner(
+	db *sql.DB, userId string,
+	queryParams BookmarksQueryParams,
+) func() (*sql.Rows, error) {
+	return func() (*sql.Rows, error) {
+		search := queryParams.search
+		query := bookmarksListQuery(userId, queryParams)
 
-	args := []any{}
-	if search != "" {
-		args = append(args, "%"+search+"%", "%"+search+"%", "%"+search+"%")
-	}
-	args = append(args, queryParams.limit, queryParams.limit*(queryParams.page-1))
+		args := []any{}
+		if search != "" {
+			args = append(args, "%"+search+"%", "%"+search+"%", "%"+search+"%")
+		}
+		args = append(args, queryParams.limit, queryParams.limit*(queryParams.page-1))
 
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := stmt.Query(args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tag sql.NullString
-	var result []BookmarkWithTag
-
-	for rows.Next() {
-		bookmark := BookmarkWithTag{}
-		if err := rows.Scan(
-			&bookmark.Id,
-			&bookmark.Url,
-			&bookmark.Title,
-			&bookmark.Description,
-			&bookmark.Notes,
-			&bookmark.CreatedAt,
-			&bookmark.UpdatedAt,
-			&tag,
-		); err != nil {
+		stmt, err := db.Prepare(query)
+		if err != nil {
 			return nil, err
 		}
 
-		if tag.Valid {
-			bookmark.Tag = tag.String
-		}
-		result = append(result, bookmark)
+		return stmt.Query(args...)
 	}
-
-	return result, rows.Err()
 }
 
 func getQueryParams(r *http.Request) BookmarksQueryParams {
