@@ -129,13 +129,14 @@ func FindOne[T any](queryRunner func() (*sql.Row, error), rowScanner func(*sql.R
 }
 
 func FindMany[T any](
-	queryRunner func() (*sql.Rows, error),
+	queryRunner func() (*sql.Stmt, *sql.Rows, error),
 	scanner func(*sql.Rows) ([]T, error),
 ) ([]T, error) {
-	rows, err := queryRunner()
+	stmt, rows, err := queryRunner()
 	if err != nil {
 		return nil, err
 	}
+	defer stmt.Close()
 	defer rows.Close()
 
 	return scanner(rows)

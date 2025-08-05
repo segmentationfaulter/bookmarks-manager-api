@@ -36,8 +36,8 @@ func CreateTags(tx utils.Execer, tags []string, userId string) error {
 	return err
 }
 
-func tagsQueryRunner(execer utils.Execer, tags []string, userId string) func() (*sql.Rows, error) {
-	return func() (*sql.Rows, error) {
+func tagsQueryRunner(execer utils.Execer, tags []string, userId string) func() (*sql.Stmt, *sql.Rows, error) {
+	return func() (*sql.Stmt, *sql.Rows, error) {
 		query := "SELECT id, name, created_at FROM tags WHERE user_id = ? AND name IN ("
 		placeholders := make([]string, len(tags))
 		for i := range tags {
@@ -51,10 +51,14 @@ func tagsQueryRunner(execer utils.Execer, tags []string, userId string) func() (
 		}
 		stmt, err := execer.Prepare(query)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return stmt.Query(args...)
+		rows, err := stmt.Query(args...)
+		if err != nil {
+			return stmt, nil, err
+		}
+		return stmt, rows, nil
 	}
 }
 

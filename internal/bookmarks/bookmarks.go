@@ -189,8 +189,8 @@ func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string 
 	return query
 }
 
-func bookmarkByIdQueryRunner(db *sql.DB, userId, bookmarkId string) func() (*sql.Rows, error) {
-	return func() (*sql.Rows, error) {
+func bookmarkByIdQueryRunner(db *sql.DB, userId, bookmarkId string) func() (*sql.Stmt, *sql.Rows, error) {
+	return func() (*sql.Stmt, *sql.Rows, error) {
 		query := `
 			SELECT b.id, b.url, b.title, b.description, b.notes, b.created_at, b.updated_at, t.name
 			FROM bookmarks b
@@ -204,16 +204,15 @@ func bookmarkByIdQueryRunner(db *sql.DB, userId, bookmarkId string) func() (*sql
 
 		stmt, err := db.Prepare(query)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		defer stmt.Close()
 
 		rows, err := db.Query(query, userId, bookmarkId)
 		if err != nil {
-			return nil, err
+			return stmt, nil, err
 		}
 
-		return rows, err
+		return stmt, rows, err
 	}
 }
 
@@ -280,8 +279,8 @@ func normalizeBookmarks(bookmarks []BookmarkWithTag) []BookmarkWithTags {
 func bookmarksListQueryRunner(
 	db *sql.DB, userId string,
 	queryParams BookmarksQueryParams,
-) func() (*sql.Rows, error) {
-	return func() (*sql.Rows, error) {
+) func() (*sql.Stmt, *sql.Rows, error) {
+	return func() (*sql.Stmt, *sql.Rows, error) {
 		search := queryParams.search
 		query := bookmarksListQuery(userId, queryParams)
 
@@ -293,10 +292,16 @@ func bookmarksListQueryRunner(
 
 		stmt, err := db.Prepare(query)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		return stmt.Query(args...)
+		rows, err := stmt.Query(args...)
+
+		if err != nil {
+			return stmt, nil, err
+		}
+
+		return stmt, rows, nil
 	}
 }
 
