@@ -214,13 +214,13 @@ func bookmarkByIdQueryRunner(db *sql.DB, userId, bookmarkId string) func() (*sql
 	}
 }
 
-func bookmarkByIdScanner(rows *sql.Rows) []BookmarkWithTag {
+func bookmarkByIdScanner(rows *sql.Rows) ([]BookmarkWithTag, error) {
 	var result []BookmarkWithTag
 
 	for rows.Next() {
 		var bookmark BookmarkWithTag
 		var tag sql.NullString
-		rows.Scan(
+		err := rows.Scan(
 			&bookmark.Id,
 			&bookmark.Url,
 			&bookmark.Title,
@@ -231,6 +231,10 @@ func bookmarkByIdScanner(rows *sql.Rows) []BookmarkWithTag {
 			&tag,
 		)
 
+		if err != nil {
+			return nil, err
+		}
+
 		if tag.Valid {
 			bookmark.Tag = tag.String
 		}
@@ -238,7 +242,7 @@ func bookmarkByIdScanner(rows *sql.Rows) []BookmarkWithTag {
 		result = append(result, bookmark)
 	}
 
-	return result
+	return result, nil
 }
 
 func normalizeBookmarks(bookmarks []BookmarkWithTag) []BookmarkWithTags {
