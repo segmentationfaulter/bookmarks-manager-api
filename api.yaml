@@ -5,7 +5,7 @@ info:
   version: 1.0.0
 
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:3000
     description: Development server
 
 paths:
@@ -19,26 +19,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '201':
+        "201":
           description: User created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisterResponse'
-        '400':
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
           description: User already exists
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/auth/login:
     post:
@@ -50,26 +50,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Login successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
-        '400':
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
           description: Invalid credentials
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/auth/me:
     get:
@@ -79,18 +79,18 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: User profile
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
-        '401':
+                $ref: "#/components/schemas/User"
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/bookmarks:
     get:
@@ -141,18 +141,18 @@ paths:
             enum: [asc, desc]
             default: desc
       responses:
-        '200':
+        "200":
           description: List of bookmarks
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BookmarkListResponse'
-        '401':
+                $ref: "#/components/schemas/BookmarkListResponse"
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     post:
       tags:
@@ -165,26 +165,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateBookmarkRequest'
+              $ref: "#/components/schemas/CreateBookmarkRequest"
       responses:
-        '201':
+        "201":
           description: Bookmark created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Bookmark'
-        '400':
+                $ref: "#/components/schemas/Bookmark"
+        "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/bookmarks/{id}:
     get:
@@ -200,24 +200,24 @@ paths:
           schema:
             type: integer
       responses:
-        '200':
+        "200":
           description: Bookmark details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Bookmark'
-        '401':
+                $ref: "#/components/schemas/Bookmark"
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
           description: Bookmark not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     put:
       tags:
@@ -236,32 +236,32 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateBookmarkRequest'
+              $ref: "#/components/schemas/UpdateBookmarkRequest"
       responses:
-        '200':
+        "200":
           description: Bookmark updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Bookmark'
-        '400':
+                $ref: "#/components/schemas/Bookmark"
+        "400":
           description: Invalid input
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
           description: Bookmark not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
     delete:
       tags:
@@ -276,20 +276,20 @@ paths:
           schema:
             type: integer
       responses:
-        '204':
+        "204":
           description: Bookmark deleted
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
           description: Bookmark not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/tags:
     get:
@@ -299,18 +299,18 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: List of tags
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TagListResponse'
-        '401':
+                $ref: "#/components/schemas/TagListResponse"
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/tags/{id}:
     delete:
@@ -326,20 +326,20 @@ paths:
           schema:
             type: integer
       responses:
-        '204':
+        "204":
           description: Tag deleted
-        '401':
+        "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
           description: Tag not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   securitySchemes:
@@ -439,7 +439,7 @@ components:
           type: string
           minLength: 3
           maxLength: 50
-          pattern: '^[a-zA-Z0-9_]+$'
+          pattern: "^[a-zA-Z0-9_]+$"
         email:
           type: string
           format: email
@@ -458,7 +458,7 @@ components:
         message:
           type: string
         user:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
       required:
         - message
         - user
@@ -481,7 +481,7 @@ components:
         token:
           type: string
         user:
-          $ref: '#/components/schemas/User'
+          $ref: "#/components/schemas/User"
       required:
         - token
         - user
@@ -492,7 +492,7 @@ components:
         url:
           type: string
           format: uri
-          pattern: '^https?://.+'
+          pattern: "^https?://.+"
         title:
           type: string
           maxLength: 500
@@ -518,7 +518,7 @@ components:
         url:
           type: string
           format: uri
-          pattern: '^https?://.+'
+          pattern: "^https?://.+"
         title:
           type: string
           maxLength: 500
@@ -542,9 +542,9 @@ components:
         bookmarks:
           type: array
           items:
-            $ref: '#/components/schemas/Bookmark'
+            $ref: "#/components/schemas/Bookmark"
         pagination:
-          $ref: '#/components/schemas/Pagination'
+          $ref: "#/components/schemas/Pagination"
       required:
         - bookmarks
         - pagination
@@ -555,7 +555,7 @@ components:
         tags:
           type: array
           items:
-            $ref: '#/components/schemas/Tag'
+            $ref: "#/components/schemas/Tag"
       required:
         - tags
 
