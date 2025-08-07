@@ -32,5 +32,6 @@ func Mux(db *sql.DB) *http.ServeMux {
 	mux.HandleFunc("GET /api/bookmarks", bookmarks.GetBookmarksList(db))
 	mux.HandleFunc("GET /api/bookmarks/{id}", bookmarks.GetBookmark(db))
 	mux.HandleFunc("PUT /api/bookmarks/{id}", bookmarks.UpdateBookmark(db))
+	mux.HandleFunc("DELETE /api/bookmarks/{id}", bookmarks.DeleteBookmark(db))
 	return mux
 }

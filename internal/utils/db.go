@@ -19,6 +19,7 @@ const (
 	GET_BOOKMARK            = `SELECT id, url, title, description, notes, created_at, updated_at FROM bookmarks WHERE id = ? AND user_id = ?;`
 	CREATE_USER             = `INSERT INTO users (username, email, password_hash) VALUES(?, ?, ?);`
 	DELETE_BOOKMARK_TAG_IDS = `DELETE FROM bookmark_tags WHERE bookmark_id = ?`
+	DELETE_BOOKMARK         = `DELETE FROM bookmarks WHERE id = ?`
 )
 
 func InitDatabase() (*sql.DB, error) {

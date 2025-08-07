@@ -249,6 +249,35 @@ func UpdateBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func DeleteBookmark(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if _, err := strconv.Atoi(id); err != nil || id == "" {
+			http.Error(w, "Invalid bookmark ID", http.StatusBadRequest)
+			return
+		}
+
+		userId, httpStatus, err := utils.IsAuthenticated(r)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+
+		_, httpStatus, err = utils.FindOne(findBookmark(db, id, string(userId)), bookmarkScanner)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+
+		if _, err := utils.Exec(db, utils.DELETE_BOOKMARK, id); err != nil {
+			http.Error(w, "Error deleting bookmark: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string {
 	var search string
 	var tagsQuery string
