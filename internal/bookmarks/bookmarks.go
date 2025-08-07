@@ -446,12 +446,30 @@ func execUpdateBookmark(
 	existingBookmark Bookmark,
 	newBookmark Bookmark,
 ) error {
-	var url *string
+	var url, title, description, notes *string
 
 	if newBookmark.Url == "" {
 		url = nil
 	} else {
 		url = &existingBookmark.Url
+	}
+
+	if newBookmark.Title == "" {
+		title = nil
+	} else {
+		title = &existingBookmark.Title
+	}
+
+	if newBookmark.Description == "" {
+		description = nil
+	} else {
+		description = &existingBookmark.Description
+	}
+
+	if newBookmark.Notes == "" {
+		notes = nil
+	} else {
+		notes = &existingBookmark.Notes
 	}
 
 	query := fmt.Sprintf(`
@@ -464,9 +482,9 @@ func execUpdateBookmark(
 			WHERE
 				id = %d
 			AND user_id = %s;
-		`, *url, existingBookmark.Title, existingBookmark.Description, existingBookmark.Notes, existingBookmark.Id, userId)
+		`, *url, *title, *description, *notes, existingBookmark.Id, userId)
 
-	_, err := utils.Exec(execer, query, url, newBookmark.Title, newBookmark.Description, newBookmark.Notes)
+	_, err := utils.Exec(execer, query, url, title, description, notes)
 	return err
 }
 
