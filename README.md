@@ -1,5 +1,7 @@
 # Bookmark Manager API
 
+> **Note:** This project was created for learning purposes to practice Go. It is not intended for production use.
+
 A RESTful API for managing bookmarks with user authentication, built primarily with the Go standard library.
 
 ## Features
@@ -108,12 +110,3 @@ Here's an example of how to register a user and create a bookmark using `curl`:
 *   **Go:** The primary programming language.
 *   **SQLite:** The database for storing data.
 *   **JWT:** For user authentication.
-
-## Contributing
-
-Contributions are welcome! Please feel free to open an issue or submit a pull request.
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
-
