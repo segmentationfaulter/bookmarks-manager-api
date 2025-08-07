@@ -33,3 +33,6 @@ bookmarks.db
 
 # Environment variables
 .env
+
+# todo's file
+TODOs.md

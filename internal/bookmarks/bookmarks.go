@@ -166,6 +166,89 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func UpdateBookmark(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if _, err := strconv.Atoi(id); err != nil || id == "" {
+			http.Error(w, "Invalid bookmark ID", http.StatusBadRequest)
+			return
+		}
+
+		userId, httpStatus, err := utils.IsAuthenticated(r)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+
+		existingBookmark, httpStatus, err := utils.FindOne(findBookmark(db, id, string(userId)), bookmarkScanner)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+
+		newBookmark, err := utils.DecodeRequestBody[struct {
+			Bookmark
+			Tags []string
+		}](r)
+		if err != nil {
+			http.Error(w, "Error decoding request: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		_, err = url.ParseRequestURI(newBookmark.Url)
+		if newBookmark.Url != "" && err != nil {
+			http.Error(w, "Invalid URL: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		tx, err := db.Begin()
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Couldn't start transaction: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := execUpdateBookmark(tx, string(userId), *existingBookmark, newBookmark.Bookmark); err != nil {
+			tx.Rollback()
+			http.Error(w, "Bookmark update failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := deleteBookmarkTagIds(tx, id); err != nil {
+			tx.Rollback()
+			http.Error(w, "Couldn't delete existing mappings in junction table: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := tags.CreateTags(tx, newBookmark.Tags, string(userId)); err != nil {
+			tx.Rollback()
+			http.Error(w, "Error creating new tags: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		savedTags, err := tags.GetTags(tx, newBookmark.Tags, string(userId))
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Error getting tags Ids: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = tags.UpdateBookmarkTags(tx, int64(existingBookmark.Id), tags.TagIds(savedTags))
+		if err != nil {
+			tx.Rollback()
+			http.Error(w, "Error updating boookmark_tags junction table"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
 func bookmarksListQuery(userID string, queryParams BookmarksQueryParams) string {
 	var search string
 	var tagsQuery string
@@ -355,4 +438,75 @@ func getQueryParams(r *http.Request) BookmarksQueryParams {
 	}
 
 	return defaultParams
+}
+
+func execUpdateBookmark(
+	execer utils.Execer,
+	userId string,
+	existingBookmark Bookmark,
+	newBookmark Bookmark,
+) error {
+	var url *string
+
+	if newBookmark.Url == "" {
+		url = nil
+	} else {
+		url = &existingBookmark.Url
+	}
+
+	query := fmt.Sprintf(`
+			UPDATE bookmarks
+			SET
+				url = COALESCE(?, '%v'),
+				title = COALESCE(?, '%s'),
+				description = COALESCE(?, '%s'),
+				notes = COALESCE(?, '%s')
+			WHERE
+				id = %d
+			AND user_id = %s;
+		`, *url, existingBookmark.Title, existingBookmark.Description, existingBookmark.Notes, existingBookmark.Id, userId)
+
+	_, err := utils.Exec(execer, query, url, newBookmark.Title, newBookmark.Description, newBookmark.Notes)
+	return err
+}
+
+func findBookmark(db *sql.DB, id, userId string) func() (*sql.Row, error) {
+	return func() (*sql.Row, error) {
+		stmt, err := db.Prepare(utils.GET_BOOKMARK)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return stmt.QueryRow(id, userId), nil
+	}
+}
+
+func bookmarkScanner(row *sql.Row) (*Bookmark, error) {
+	bookmark := new(Bookmark)
+
+	err := row.Scan(
+		&bookmark.Id,
+		&bookmark.Url,
+		&bookmark.Title,
+		&bookmark.Description,
+		&bookmark.Notes,
+		&bookmark.CreatedAt,
+		&bookmark.UpdatedAt,
+	)
+
+	return bookmark, err
+}
+
+func deleteBookmarkTagIds(execer utils.Execer, id string) error {
+	stmt, err := execer.Prepare(utils.DELETE_BOOKMARK_TAG_IDS)
+	if err != nil {
+		return err
+	}
+
+	if _, err := stmt.Exec(id); err != nil {
+		return err
+	}
+
+	return nil
 }
