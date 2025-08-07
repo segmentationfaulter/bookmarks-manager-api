@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Build a RESTful API for managing bookmarks with user authentication using only Go's standard library.
+Build a RESTful API for managing bookmarks with user authentication using mostly Go's standard library.
 
 ## Core Features
 
@@ -59,7 +59,7 @@ Build a RESTful API for managing bookmarks with user authentication using only G
 ```json
 {
   "username": "johndoe",
-  "email": "john@example.com", 
+  "email": "john@example.com",
   "password": "securepassword123"
 }
 ```
@@ -95,7 +95,7 @@ Build a RESTful API for managing bookmarks with user authentication using only G
     {
       "id": 1,
       "url": "https://golang.org",
-      "title": "Go Programming Language", 
+      "title": "Go Programming Language",
       "description": "Official Go website",
       "notes": "Great learning resource",
       "tags": ["programming", "go"],
@@ -138,7 +138,7 @@ Build a RESTful API for managing bookmarks with user authentication using only G
 ### Bookmarks
 - URL: Valid HTTP/HTTPS format
 - Title: Maximum 500 characters
-- Description: Maximum 2000 characters  
+- Description: Maximum 2000 characters
 - Notes: Maximum 5000 characters
 - Tags: Maximum 20 tags, each 1-50 characters
 
