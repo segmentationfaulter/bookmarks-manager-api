@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,28 @@ func GetTagsHandler(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(tags)
+	}
+}
+
+func DeleteTagHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if _, err := strconv.Atoi(id); err != nil || id == "" {
+			http.Error(w, "Invalid tag ID", http.StatusBadRequest)
+			return
+		}
+
+		userId, httpStatus, err := utils.IsAuthenticated(r)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+
+		if _, err := utils.Exec(db, utils.DELETE_TAG, id, userId); err != nil {
+			http.Error(w, "Error deleting tag: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

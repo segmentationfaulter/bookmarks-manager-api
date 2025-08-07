@@ -269,7 +269,7 @@ func DeleteBookmarkHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if _, err := utils.Exec(db, utils.DELETE_BOOKMARK, id); err != nil {
+		if _, err := utils.Exec(db, utils.DELETE_BOOKMARK, id, userId); err != nil {
 			http.Error(w, "Error deleting bookmark: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

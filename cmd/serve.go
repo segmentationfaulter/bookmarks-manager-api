@@ -41,6 +41,7 @@ func Mux(db *sql.DB) *http.ServeMux {
 
 	// tags endpoints
 	mux.HandleFunc("GET /api/tags", tags.GetTagsHandler(db))
+	mux.HandleFunc("DELETE /api/tags/{id}", tags.DeleteTagHandler(db))
 
 	return mux
 }
