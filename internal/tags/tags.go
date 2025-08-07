@@ -2,6 +2,8 @@ package tags
 
 import (
 	"database/sql"
+	"encoding/json"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,6 +14,26 @@ type Tag struct {
 	Id        int       `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+func GetTagsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userId, httpStatus, err := utils.IsAuthenticated(r)
+		if err != nil {
+			http.Error(w, err.Error(), httpStatus)
+			return
+		}
+
+		tags, err := GetTags(db, nil, string(userId))
+
+		if err != nil {
+			http.Error(w, "Error getting tags: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tags)
+	}
 }
 
 func CreateTags(tx utils.Execer, tags []string, userId string) error {
@@ -38,12 +60,20 @@ func CreateTags(tx utils.Execer, tags []string, userId string) error {
 
 func tagsQueryRunner(execer utils.Execer, tags []string, userId string) func() (*sql.Stmt, *sql.Rows, error) {
 	return func() (*sql.Stmt, *sql.Rows, error) {
-		query := "SELECT id, name, created_at FROM tags WHERE user_id = ? AND name IN ("
-		placeholders := make([]string, len(tags))
-		for i := range tags {
-			placeholders[i] = "?"
+		baseQuery := "SELECT id, name, created_at FROM tags WHERE user_id = ?"
+		var tagsFilter string
+
+		if len(tags) > 0 {
+			tagsFilter = " AND name IN ("
+			placeholders := make([]string, len(tags))
+			for i := range tags {
+				placeholders[i] = "?"
+			}
+
+			tagsFilter = tagsFilter + strings.Join(placeholders, ", ") + ")"
 		}
-		query = query + strings.Join(placeholders, ", ") + ")"
+
+		query := baseQuery + tagsFilter
 
 		args := []any{userId}
 		for _, tag := range tags {
@@ -77,10 +107,6 @@ func tagsScanner(rows *sql.Rows) ([]Tag, error) {
 }
 
 func GetTags(execer utils.Execer, tags []string, userId string) ([]Tag, error) {
-	if len(tags) == 0 {
-		return []Tag{}, nil
-	}
-
 	return utils.FindMany(tagsQueryRunner(execer, tags, userId), tagsScanner)
 }
 

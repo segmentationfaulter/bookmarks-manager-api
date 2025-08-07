@@ -44,7 +44,7 @@ type BookmarkWithTags struct {
 	Tags []string `json:"tags"`
 }
 
-func GetBookmarksList(db *sql.DB) http.HandlerFunc {
+func GetBookmarksListHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userId, httpStatus, err := utils.IsAuthenticated(r)
 		if err != nil {
@@ -66,7 +66,7 @@ func GetBookmarksList(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func GetBookmark(db *sql.DB) http.HandlerFunc {
+func GetBookmarkHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if _, err := strconv.Atoi(id); err != nil || id == "" {
@@ -94,7 +94,7 @@ func GetBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func CreateBookmark(db *sql.DB) http.HandlerFunc {
+func CreateBookmarkHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userId, httpStatus, err := utils.IsAuthenticated(r)
 		if err != nil {
@@ -166,7 +166,7 @@ func CreateBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func UpdateBookmark(db *sql.DB) http.HandlerFunc {
+func UpdateBookmarkHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if _, err := strconv.Atoi(id); err != nil || id == "" {
@@ -249,7 +249,7 @@ func UpdateBookmark(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func DeleteBookmark(db *sql.DB) http.HandlerFunc {
+func DeleteBookmarkHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if _, err := strconv.Atoi(id); err != nil || id == "" {
