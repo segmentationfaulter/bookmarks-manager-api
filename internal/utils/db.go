@@ -3,6 +3,7 @@ package utils
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -27,6 +28,10 @@ func InitDatabase() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "./bookmarks.db")
 	if err != nil {
 		return nil, err
+	}
+
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON;`); err != nil {
+		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
 	schema := `
