@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/segmentationfaulter/bookmarks-manager-api/internal/bookmarks"
@@ -15,13 +20,41 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Unable to load environment variables")
+		log.Fatalf("Unable to load environment variables: %v", err)
 	}
 	db, err := utils.InitDatabase()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Unable to initialize database: %v", err)
 	}
-	log.Fatal(http.ListenAndServe(":3000", Mux(db)))
+	defer db.Close()
+
+	server := http.Server{
+		Addr:    ":3000",
+		Handler: Mux(db),
+	}
+
+	quitSignal := make(chan os.Signal, 1)
+	signal.Notify(quitSignal, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("ListenAndServe: %v", err)
+		}
+	}()
+
+	<-quitSignal
+
+	log.Println("Shutting down server...")
+
+	// Give active requests up to 5 seconds to finish
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exited cleanly")
 }
 
 func Mux(db *sql.DB) *http.ServeMux {
